@@ -4,7 +4,7 @@ top of Python Flask, Requests and Beautiful Soup. This is a student project and 
 
 ## purpose
 Checking for new marks in dualis can be very tedious. I thought, it would be great to automate it and spend your time on things
-and spend my time on things that count. That`s why I decided to create an API interface to query all your grades at once, 
+that count. That`s why I decided to create an API interface to query all your grades at once, 
 which can then connect to all your apps and bots.
 
 ## usage
@@ -58,7 +58,7 @@ $ make
 ```
 
 ## todos
-See the [issues tab](https://github.com/KarelZe/yown/issues) for details.
+See the [issues tab](https://github.com/KarelZe/dualis/issues) for details.
 
 ## contact
 
