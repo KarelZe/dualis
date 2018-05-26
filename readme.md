@@ -12,7 +12,7 @@ which can then connect to all your apps and bots.
 Using the API is really simple as there is just one endpoint, that let's you query all grades from all semesters. Just 
 pass in your credentials in the body of the GET request and you are good to go. Be aware, it might take a few seconds
 until you receive a response, as the API has to make plenty of requests until all data is gathered (for my account it 
-took around 20 sec.)
+took around 16 sec.)
 ```
 $ curl -i -H "Content-Type: application/json" -X GET -d '{"user":"karel.zeman@dhbw-karlsruhe.de","password":"journeyToTheCenterOftheEarth"}' http://localhost:5000/dualis/api/v1.0/grades/
 ```
@@ -47,10 +47,10 @@ $ curl -i -H "Content-Type: application/json" -X GET -d '{"user":"karel.zeman@dh
 ]
 ```
 ## installation
-Installing is rather straight forward, but here is how you'd wanna do it.
+Installing is rather straight forward. But here is how to do it:
 ### linux
 ```
-$ wget https://github.com/KarelZe/dualis/archive/dualis.zip
+$ wget https://github.com/KarelZe/dualis/archive/master.zip
 $ unzip master.zip
 $ mv dualis-master dualis
 $ cd dualis
