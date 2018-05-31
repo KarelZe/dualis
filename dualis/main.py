@@ -9,7 +9,6 @@ from werkzeug.exceptions import abort
 app = Flask(__name__)
 
 BASE_URL = "https://dualis.dhbw.de"
-
 units = []
 
 
@@ -34,7 +33,7 @@ def get_grades():
     """
     if not request.json or not 'password' in request.json or not 'user' in request.json:
         abort(401)
-
+    # TODO: Refactor spaghetti code :)
     # retrieve password and username from body
     request_json = request.get_json()
     user = request_json.get('user')
@@ -77,7 +76,7 @@ def get_grades():
     with futures.ThreadPoolExecutor(8) as semester_pool:
         tmp = semester_pool.map(parse_semester, semester_urls, [login_response.cookies] * len(semester_urls))
     unit_urls = list(itertools.chain.from_iterable(tmp))
-    print(tmp)
+
     # query all unit_urls to obtain grades in parallel
     with futures.ThreadPoolExecutor(8) as detail_pool:
         semester = detail_pool.map(parse_unit, unit_urls, [login_response.cookies] * len(unit_urls))
@@ -106,7 +105,8 @@ def parse_student_results(url, cookies):
 
 def parse_semester(url, cookies):
     """
-    function calls the dualis web page of a given a semester to extract the urls of the units within the semester
+    function calls the dualis web page of a given a semester to extract the urls of all units within the semester.
+    It's searching for script-tags containing the urls and crops away the surrounding javascript.
     :param url: url of the semester page
     :param cookies: cookie for the semester page
     :return: list with urls of all units in semester
@@ -131,9 +131,25 @@ def parse_unit(url, cookies):
     table = detail_soup.find("table", {"class": "tb"})
     td = [td.text.strip() for td in table.find_all("td")]
     unit = {'name': h1.replace("\n", " ").replace("\r", ""), 'exams': []}
-    for idx in range(13, len(td) - 5, 6):
-        exam = {'name': td[idx], 'date': td[idx + 1], 'grade': td[idx + 2], 'externally accepted': td[idx + 3]}
+    # units have non uniform structure. Try to map based on total size.
+    if len(td) <= 24:
+        exam = {'name': td[13], 'date': td[14], 'grade': td[15], 'externally accepted': False}
         unit['exams'].append(exam)
+    elif len(td) <= 29:
+        exam = {'name': td[19], 'date': td[14], 'grade': td[21], 'externally accepted': False}
+        unit['exams'].append(exam)
+    elif len(td) == 30:
+        for idx in range(13, len(td) - 5, 6):
+            exam = {'name': td[idx], 'date': td[idx + 1], 'grade': td[idx + 2], 'externally accepted': False}
+            unit['exams'].append(exam)
+    elif len(td) <= 31:
+        for idx in range(11, len(td) - 7, 7):
+            exam = {'name': td[idx], 'date': td[idx + 3], 'grade': td[idx + 4], 'externally accepted': False}
+            unit['exams'].append(exam)
+    else:
+        for idx in range(19, len(td) - 5, 6):
+            exam = {'name': td[idx], 'date': td[14], 'grade': td[idx + 2], 'externally accepted': False}
+            unit['exams'].append(exam)
     return unit
 
 
