@@ -1,3 +1,6 @@
+import itertools
+from concurrent import futures
+
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
@@ -6,6 +9,7 @@ from werkzeug.exceptions import abort
 app = Flask(__name__)
 
 base_url = "https://dualis.dhbw.de"
+units = []
 
 
 @app.route("/dualis/api/v1.0/grades/", methods=['GET'])
@@ -54,38 +58,61 @@ def get_grades():
     soup = BeautifulSoup(semester_ids_response.content, 'html.parser')
     options = soup.find_all('option')
     semester_ids = [option['value'] for option in options]
+    semester_urls = [url_content[:-15] + semester_id for semester_id in semester_ids]
 
-    units = []
-    for semester_id in semester_ids:
-        semester_response = requests.get(url_content[:-15] + semester_id, cookies=login_response.cookies)
-        semester_soup = BeautifulSoup(semester_response.content, 'html.parser')
+    # search for all unit_urls in parallel
+    with futures.ThreadPoolExecutor(8) as semester_pool:
+        tmp = semester_pool.map(parse_semester, semester_urls, [login_response.cookies] * len(semester_urls))
+    unit_urls = list(itertools.chain.from_iterable(tmp))
 
-        # get unit details from javascript
-        unit_urls = []
-        for script in semester_soup.find_all('script'):
-            unshortend_url = script.next.strip()
-            url = unshortend_url[301:414]
-            if url is not "":
-                unit_urls.append(url)
-
-        # querying unit details
-        for url in unit_urls:
-            detail_response = requests.get(base_url + url, cookies=login_response.cookies)
-            detail_soup = BeautifulSoup(detail_response.content, "html.parser")
-            h1 = detail_soup.find("h1").text.strip()
-            table = detail_soup.find("table", {"class": "tb"})
-            td = [td.text.strip() for td in table.find_all("td")]
-            unit = {'name': h1.replace("\n", " ").replace("\r", ""), 'exams': []}
-            for idx in range(13, len(td) - 5, 6):
-                exam = {'name': td[idx], 'date': td[idx + 1], 'grade': td[idx + 2], 'externally accepted': td[idx + 3]}
-                unit['exams'].append(exam)
-            units.append(unit)
+    # query all unit_urls to obtain grades in parallel
+    with futures.ThreadPoolExecutor(8) as detail_pool:
+        semester = detail_pool.map(parse_unit, unit_urls, [login_response.cookies] * len(unit_urls))
+    units.extend(semester)
 
     # find logout url in html source code and logout
     logout_url = base_url + soup.find('a', {'id': 'logoutButton'})['href']
     logout(logout_url, cookie_request.cookies)
     # return dict containing units and exams as valid json
     return jsonify(units), 200
+
+
+def parse_semester(url, cookies):
+    """
+    function calls the dualis web page of a given a semester to extract the urls of the units within the semester
+    :param url: url of the semester page
+    :param cookies: cookie for the semester page
+    :return: list with urls of all units in semester
+    """
+    semester_response = requests.get(url, cookies=cookies)
+    semester_soup = BeautifulSoup(semester_response.content, 'html.parser')
+    # get unit details from javascript
+    units_in_semester = []
+    for script in semester_soup.find_all('script'):
+        unshortend_url = script.next.strip()
+        url = unshortend_url[301:414]
+        if url is not "":
+            units_in_semester.append(url)
+    return units_in_semester
+
+
+def parse_unit(url, cookies):
+    """
+    function calls the dualis webpage of a given module to extract the grades
+    :param url: url for unit page
+    :param cookies: cookie for unit page
+    :return: unit with information about name and exams incl. grades
+    """
+    response = requests.get(url=base_url+url, cookies=cookies)
+    detail_soup = BeautifulSoup(response.content, "html.parser")
+    h1 = detail_soup.find("h1").text.strip()
+    table = detail_soup.find("table", {"class": "tb"})
+    td = [td.text.strip() for td in table.find_all("td")]
+    unit = {'name': h1.replace("\n", " ").replace("\r", ""), 'exams': []}
+    for idx in range(13, len(td) - 5, 6):
+        exam = {'name': td[idx], 'date': td[idx + 1], 'grade': td[idx + 2], 'externally accepted': td[idx + 3]}
+        unit['exams'].append(exam)
+    return unit
 
 
 def logout(url, cookies):
