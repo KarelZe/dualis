@@ -8,8 +8,21 @@ from werkzeug.exceptions import abort
 
 app = Flask(__name__)
 
-base_url = "https://dualis.dhbw.de"
+BASE_URL = "https://dualis.dhbw.de"
+
 units = []
+
+
+@app.route("/dualis/api/v1.0/semesters/", methods=['GET'])
+def get_semesters():
+    # TODO: refactor code so that semesters can be accessed through endpoint
+    return jsonify({}), 200
+
+
+@app.route("/dualis/api/v1.0/units/", methods=['GET'])
+def get_units():
+    # TODO: refactor code so that units and all relating exams can be accessed through endpoint
+    return jsonify({}), 200
 
 
 @app.route("/dualis/api/v1.0/grades/", methods=['GET'])
@@ -28,7 +41,7 @@ def get_grades():
     password = request_json.get('password')
 
     # create a session
-    url = base_url + "/scripts/mgrqcgi?APPNAME=CampusNet&PRGNAME=EXTERNALPAGES&ARGUMENTS=-N000000000000001,-N000324,-Awelcome"
+    url = BASE_URL + "/scripts/mgrqcgi?APPNAME=CampusNet&PRGNAME=EXTERNALPAGES&ARGUMENTS=-N000000000000001,-N000324,-Awelcome"
     cookie_request = requests.get(url)
 
     data = {"usrname": user, "pass": password,
@@ -48,7 +61,7 @@ def get_grades():
         abort(login_response.status_code)
 
     # redirecting to course results...
-    url_content = base_url + "/scripts/mgrqcgi?APPNAME=CampusNet&PRGNAME=STARTPAGE_DISPATCH&ARGUMENTS=" + arguments[79:]
+    url_content = BASE_URL + "/scripts/mgrqcgi?APPNAME=CampusNet&PRGNAME=STARTPAGE_DISPATCH&ARGUMENTS=" + arguments[79:]
     url_content = url_content.replace("STARTPAGE_DISPATCH", "COURSERESULTS")
     semester_ids_response = requests.get(url_content, cookies=login_response.cookies)
     if not semester_ids_response.ok:
@@ -64,14 +77,14 @@ def get_grades():
     with futures.ThreadPoolExecutor(8) as semester_pool:
         tmp = semester_pool.map(parse_semester, semester_urls, [login_response.cookies] * len(semester_urls))
     unit_urls = list(itertools.chain.from_iterable(tmp))
-
+    print(tmp)
     # query all unit_urls to obtain grades in parallel
     with futures.ThreadPoolExecutor(8) as detail_pool:
         semester = detail_pool.map(parse_unit, unit_urls, [login_response.cookies] * len(unit_urls))
     units.extend(semester)
 
     # find logout url in html source code and logout
-    logout_url = base_url + soup.find('a', {'id': 'logoutButton'})['href']
+    logout_url = BASE_URL + soup.find('a', {'id': 'logoutButton'})['href']
     logout(logout_url, cookie_request.cookies)
     # return dict containing units and exams as valid json
 
@@ -100,14 +113,9 @@ def parse_semester(url, cookies):
     """
     semester_response = requests.get(url, cookies=cookies)
     semester_soup = BeautifulSoup(semester_response.content, 'html.parser')
+    table = semester_soup.find("table", {"class": "list"})
     # get unit details from javascript
-    units_in_semester = []
-    for script in semester_soup.find_all('script'):
-        unshortend_url = script.next.strip()
-        url = unshortend_url[301:414]
-        if url is not "":
-            units_in_semester.append(url)
-    return units_in_semester
+    return [script.text.strip()[301:414] for script in table.find_all("script")]
 
 
 def parse_unit(url, cookies):
@@ -117,7 +125,7 @@ def parse_unit(url, cookies):
     :param cookies: cookie for unit page
     :return: unit with information about name and exams incl. grades
     """
-    response = requests.get(url=base_url+url, cookies=cookies)
+    response = requests.get(url=BASE_URL + url, cookies=cookies)
     detail_soup = BeautifulSoup(response.content, "html.parser")
     h1 = detail_soup.find("h1").text.strip()
     table = detail_soup.find("table", {"class": "tb"})
