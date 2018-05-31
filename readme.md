@@ -1,6 +1,6 @@
 # dualis api
 This is an **unofficial API** for [dualis](https://www.dualis.dhbw.de) by DHBW (Cooperative State Univerity) built on 
-top of Python Flask, Requests and Beautiful Soup. This is a student project and is not affiliated with DHBW.
+top of Python Flask, Requests and Beautiful Soup. This is a student project which is not affiliated with DHBW.
 
 ## purpose
 Checking for new marks in dualis can be very tedious. I thought, it would be great to automate it and spend your time on things
@@ -11,8 +11,7 @@ which can then connect to all your apps and bots.
 ### sample request
 Using the API is really simple as there is just one endpoint, that let's you query all grades from all semesters. Just 
 pass in your credentials in the body of the GET request and you are good to go. Be aware, it might take a few seconds
-until you receive a response, as the API has to make plenty of requests until all data is gathered (for my account it 
-took around 16 sec.)
+until you receive a response, as the API has to make plenty of requests until all data is gathered.
 ```
 $ curl -i -H "Content-Type: application/json" -X GET -d '{"user":"karel.zeman@dhbw-karlsruhe.de","password":"journeyToTheCenterOftheEarth"}' http://localhost:5000/dualis/api/v1.0/grades/
 ```
