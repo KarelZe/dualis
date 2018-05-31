@@ -74,7 +74,21 @@ def get_grades():
     logout_url = base_url + soup.find('a', {'id': 'logoutButton'})['href']
     logout(logout_url, cookie_request.cookies)
     # return dict containing units and exams as valid json
+
     return jsonify(units), 200
+
+
+def parse_student_results(url, cookies):
+    """
+    This function calls the dualis web page of a given semester to query for all modules, that have been finished.
+    :param url: url of STUDENT_RESULT page
+    :param cookies: cookie of current session
+    :return: list of urls for units
+    """
+    response = requests.get(url=url, cookies=cookies)
+    student_result_soup = BeautifulSoup(response.content, "html.parser")
+    table = student_result_soup.find("table", {"class": "students_results"})
+    return [a['href'] for a in table.find_all("a", href=True)]
 
 
 def parse_semester(url, cookies):
